@@ -230,15 +230,43 @@
     cursor:pointer;
     text-decoration:underline;
   }
-  .entry.kind-ruling{
+  .entry.kind-ruling, .entry.kind-order{
     border-left-width:6px;
     border-left-color:var(--judge);
     background:#FBF6E9;
   }
-  .entry.kind-ruling .phase-tag{
+  .entry.kind-ruling .phase-tag, .entry.kind-order .phase-tag{
     color:var(--judge);
     font-weight:600;
   }
+  .entry.kind-verdict{
+    border-left-width:6px;
+    border-left-color:#6B7A50;
+    background:#F2F4EA;
+  }
+  .entry.kind-verdict .entry-text{ font-family:'IBM Plex Sans', sans-serif; white-space:pre-line; }
+  .entry.kind-motion{ border-left-style:dotted; }
+  .entry.kind-instructions{
+    background:transparent;
+    color:var(--muted);
+    font-size:13px;
+    border-left-style:dashed;
+  }
+  .entry.kind-procedural .entry-text{ font-style:italic; color:#5c6355; }
+
+  .batch-row{ display:flex; gap:8px; align-items:center; margin-top:8px; }
+  .batch-row input[type=number]{ width:64px; flex:none; }
+  .batch-summary{
+    background:var(--paper);
+    color:var(--ink);
+    padding:14px 18px;
+    max-width:760px;
+    margin-bottom:14px;
+    font-size:13.5px;
+    line-height:1.6;
+  }
+  .batch-summary h3{ margin:0 0 8px; font-family:'Source Serif 4', serif; font-size:16px; }
+  .batch-summary .caveat{ color:#7a6a3a; font-size:12px; margin-top:8px; }
 </style>
 </head>
 <body>
@@ -331,6 +359,13 @@
     </div>
 
     <button class="btn-primary" id="start-btn" onclick="startSession()">Begin proceeding</button>
+    <div class="status-line" id="run-status"></div>
+
+    <div class="batch-row">
+      <button class="btn-secondary" id="batch-btn" onclick="runBatch()" style="margin-top:0;">Run N times &amp; compare</button>
+      <input type="number" id="batch-n" value="3" min="1" max="5" />
+    </div>
+    <div class="status-line">No seed control exists in the API — this samples variance across independent runs, it does not reproduce one exact run.</div>
   </div>
 
   <div class="main" id="main">
@@ -403,7 +438,15 @@ function appendEntry(entry){
   speaker.textContent = entry.speaker;
   const tag = document.createElement('span');
   tag.className = 'phase-tag';
-  tag.textContent = entry.kind === 'ruling' ? 'RULING (SIMULATED)' : entry.phase.replace(/_/g,' ');
+  const kindLabels = {
+    ruling: 'RULING (SIMULATED)',
+    order: 'POST-VERDICT ORDER (SIMULATED)',
+    verdict: 'JURY VERDICT (SIMULATED)',
+    motion: 'POST-TRIAL MOTION',
+    instructions: 'JURY INSTRUCTIONS',
+    procedural: 'PROCEDURAL NOTE',
+  };
+  tag.textContent = kindLabels[entry.kind] || entry.phase.replace(/_/g,' ');
   head.appendChild(speaker);
   head.appendChild(tag);
   div.appendChild(head);
@@ -466,7 +509,10 @@ async function startSession(){
         const jsonStr = part.slice(5).trim();
         if(!jsonStr) continue;
         const entry = JSON.parse(jsonStr);
-        if(entry.kind === 'done') continue;
+        if(entry.kind === 'done'){
+          document.getElementById('run-status').textContent = 'Run ID: ' + entry.run_id + ' (saved to runs/ on the server)';
+          continue;
+        }
         appendEntry(entry);
       }
     }
@@ -475,6 +521,68 @@ async function startSession(){
   }finally{
     btn.disabled = false;
     btn.textContent = 'Begin proceeding';
+  }
+}
+
+async function runBatch(){
+  const btn = document.getElementById('batch-btn');
+  const n = parseInt(document.getElementById('batch-n').value, 10) || 3;
+  btn.disabled = true;
+  btn.textContent = 'Running ' + n + '…';
+
+  const payload = {
+    judge: collectProfile('judge', 'judge'),
+    counsel_a: collectProfile('a', 'counsel'),
+    counsel_b: collectProfile('b', 'counsel'),
+    case_description: document.getElementById('case-description').value.trim(),
+    case_type: document.getElementById('case-type').value,
+    num_rounds: parseInt(document.getElementById('num-rounds').value, 10) || 2,
+    include_judge_questions: document.getElementById('judge-questions').checked,
+    num_runs: n
+  };
+
+  try{
+    const resp = await fetch('/api/session/batch', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const data = await resp.json();
+    const main = document.getElementById('main');
+    const emptyState = main.querySelector('.empty-state');
+    if(emptyState) emptyState.remove();
+
+    const div = document.createElement('div');
+    div.className = 'batch-summary';
+    let html = `<h3>Spread across ${data.num_runs_executed} runs</h3>`;
+    html += `<div>Run IDs: ${data.run_ids.join(', ')}</div>`;
+    const s = data.summary;
+    if(s.full_trial){
+      html += '<div style="margin-top:8px;"><strong>Jury verdict spread:</strong></div>';
+      for(const [qid, q] of Object.entries(s.full_trial.verdict_questions)){
+        if(q.type === 'yes_no'){
+          html += `<div>${q.text} — yes: ${q.yes}, no: ${q.no}</div>`;
+        } else if(q.type === 'amount'){
+          html += `<div>${q.text} — min $${q.min.toLocaleString()}, max $${q.max.toLocaleString()}, mean $${Math.round(q.mean).toLocaleString()}</div>`;
+        } else {
+          html += `<div>${q.text} — ${q.answers.join(' | ')}</div>`;
+        }
+      }
+      html += `<div style="margin-top:6px;">JMOL motion raised in ${s.full_trial.jmol_raised_count} of ${s.full_trial.runs} runs.</div>`;
+      html += `<div class="caveat">${s.full_trial.note}</div>`;
+    }
+    if(s.motion_hearing){
+      html += `<div>Motion hearing: "granted" keyword matched in ${s.motion_hearing.granted_keyword_count} of ${s.motion_hearing.runs} runs.</div>`;
+      html += `<div class="caveat">${s.motion_hearing.note}</div>`;
+    }
+    div.innerHTML = html;
+    main.appendChild(div);
+    main.scrollTop = main.scrollHeight;
+  }catch(err){
+    appendEntry({phase:'error', speaker:'System', role:'system', kind:'system', text:'Batch run failed — check the server console.'});
+  }finally{
+    btn.disabled = false;
+    btn.textContent = 'Run N times & compare';
   }
 }
 </script>
