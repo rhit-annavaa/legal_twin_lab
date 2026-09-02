@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Legal Twin Simulation Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #14181C;
+    --paper: #F6F1E4;
+    --ink: #22271F;
+    --muted: #9AA39A;
+    --rule: #2B322C;
+    --judge: #A6803E;
+    --judge-soft: #3A331F;
+    --counsel-a: #4E7898;
+    --counsel-a-soft: #22303A;
+    --counsel-b: #A05A5A;
+    --counsel-b-soft: #382323;
+    --system: #7C8578;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--paper);
+    font-family:'IBM Plex Sans', sans-serif;
+    min-height:100vh;
+  }
+  .banner{
+    background:#0C0F11;
+    border-bottom:1px solid var(--rule);
+    padding:10px 24px;
+    font-size:13px;
+    color:var(--muted);
+    display:flex;
+    gap:8px;
+    align-items:center;
+  }
+  .banner strong{ color:var(--paper); font-weight:600; }
+  .layout{
+    display:flex;
+    min-height:calc(100vh - 41px);
+  }
+  .sidebar{
+    width:360px;
+    flex-shrink:0;
+    border-right:1px solid var(--rule);
+    padding:22px 20px 60px;
+    overflow-y:auto;
+    max-height:calc(100vh - 41px);
+  }
+  .sidebar h1{
+    font-family:'Source Serif 4', serif;
+    font-size:21px;
+    margin:0 0 4px;
+    font-weight:600;
+  }
+  .sidebar .sub{
+    color:var(--muted);
+    font-size:13px;
+    margin:0 0 22px;
+    line-height:1.5;
+  }
+  .block{
+    border:1px solid var(--rule);
+    border-left:3px solid var(--rule-accent, var(--muted));
+    padding:14px 14px 16px;
+    margin-bottom:16px;
+  }
+  .block.judge{ --rule-accent: var(--judge); }
+  .block.counsel-a{ --rule-accent: var(--counsel-a); }
+  .block.counsel-b{ --rule-accent: var(--counsel-b); }
+  .block h2{
+    font-size:12px;
+    text-transform:none;
+    letter-spacing:0.02em;
+    margin:0 0 10px;
+    font-weight:600;
+    color:var(--paper);
+  }
+  label{
+    display:block;
+    font-size:11.5px;
+    color:var(--muted);
+    margin:10px 0 4px;
+  }
+  input[type=text], textarea, select, input[type=number]{
+    width:100%;
+    background:#1B2024;
+    border:1px solid var(--rule);
+    color:var(--paper);
+    padding:7px 9px;
+    font-family:inherit;
+    font-size:13px;
+    border-radius:2px;
+  }
+  textarea{ resize:vertical; min-height:56px; line-height:1.4; }
+  .row{ display:flex; gap:8px; }
+  .row > *{ flex:1; }
+  button{
+    font-family:inherit;
+    font-size:13px;
+    font-weight:500;
+    cursor:pointer;
+    border-radius:2px;
+    border:1px solid var(--rule);
+  }
+  .btn-secondary{
+    background:transparent;
+    color:var(--paper);
+    padding:7px 10px;
+    margin-top:10px;
+  }
+  .btn-secondary:hover{ border-color:var(--paper); }
+  .btn-primary{
+    width:100%;
+    background:var(--judge);
+    color:#14181C;
+    border:none;
+    padding:12px;
+    font-size:14px;
+    font-weight:600;
+    margin-top:6px;
+  }
+  .btn-primary:disabled{ opacity:0.5; cursor:not-allowed; }
+  .status-line{
+    font-size:11.5px;
+    color:var(--muted);
+    margin-top:6px;
+    min-height:14px;
+  }
+  .checkbox-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-top:14px;
+    font-size:13px;
+    color:var(--paper);
+  }
+  .checkbox-row input{ width:auto; }
+
+  .main{
+    flex:1;
+    padding:22px 32px 80px;
+    overflow-y:auto;
+    max-height:calc(100vh - 41px);
+  }
+  .case-caption{
+    font-family:'Source Serif 4', serif;
+    font-size:20px;
+    color:var(--paper);
+    margin-bottom:4px;
+  }
+  .case-sub{
+    color:var(--muted);
+    font-size:13px;
+    margin-bottom:28px;
+  }
+  .empty-state{
+    color:var(--muted);
+    font-size:14px;
+    margin-top:60px;
+    max-width:420px;
+    line-height:1.6;
+  }
+  .entry{
+    background:var(--paper);
+    color:var(--ink);
+    border-left:4px solid var(--muted);
+    padding:14px 18px;
+    margin-bottom:14px;
+    max-width:760px;
+    animation: rise 0.25s ease-out;
+  }
+  @keyframes rise{
+    from{ opacity:0; transform:translateY(6px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
+  .entry.role-judge{ border-left-color:var(--judge); }
+  .entry.role-counsel_a{ border-left-color:var(--counsel-a); }
+  .entry.role-counsel_b{ border-left-color:var(--counsel-b); }
+  .entry.role-system{
+    background:transparent;
+    color:var(--muted);
+    border-left-color:var(--rule);
+    font-size:13px;
+    max-width:760px;
+    padding:8px 18px;
+  }
+  .entry-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    margin-bottom:6px;
+  }
+  .speaker{
+    font-weight:600;
+    font-size:13.5px;
+  }
+  .phase-tag{
+    font-size:11px;
+    color:#5c6355;
+  }
+  .entry-text{
+    font-family:'Source Serif 4', serif;
+    font-size:15.5px;
+    line-height:1.6;
+    white-space:pre-wrap;
+  }
+  .entry.kind-question .entry-text{ font-style:italic; }
+  .entry.kind-reasoning{
+    background:#1B2024;
+    color:var(--muted);
+    border-left-style:dashed;
+    border-left-color:var(--judge);
+  }
+  .entry.kind-reasoning .speaker{ color:var(--paper); }
+  .entry.kind-reasoning .entry-text{
+    font-family:'IBM Plex Sans', sans-serif;
+    font-size:13.5px;
+    display:none;
+  }
+  .entry.kind-reasoning.expanded .entry-text{ display:block; }
+  .reasoning-toggle{
+    font-size:11.5px;
+    color:var(--judge);
+    cursor:pointer;
+    text-decoration:underline;
+  }
+  .entry.kind-ruling{
+    border-left-width:6px;
+    border-left-color:var(--judge);
+    background:#FBF6E9;
+  }
+  .entry.kind-ruling .phase-tag{
+    color:var(--judge);
+    font-weight:600;
+  }
+</style>
+</head>
+<body>
+
+<div class="banner">
+  ⚖ <strong>Simulated proceeding</strong> — internal testing only. Every statement below is an AI-generated
+  prediction grounded in public record, not a real statement, filing, or ruling by the named individuals.
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+    <h1>Legal Twin Simulation Lab</h1>
+    <p class="sub">Build public-record profiles for a judge and two counsel, describe a matter, and run a simulated proceeding end to end.</p>
+
+    <div class="block judge">
+      <h2>Presiding Judge</h2>
+      <label>Full name</label>
+      <input type="text" id="judge-name" placeholder="e.g. Jane R. Whitfield" />
+      <label>Disambiguating hint (court, jurisdiction — optional)</label>
+      <input type="text" id="judge-hint" placeholder="e.g. N.D. Cal." />
+      <button class="btn-secondary" onclick="researchProfile('judge')">Research public record</button>
+      <div class="status-line" id="judge-status"></div>
+      <label>Bio</label>
+      <textarea id="judge-bio" rows="2"></textarea>
+      <label>Documented tendencies (one per line)</label>
+      <textarea id="judge-tendencies" rows="3"></textarea>
+      <label>Sources (one per line)</label>
+      <textarea id="judge-sources" rows="2"></textarea>
+      <label>Your notes (override / supplement)</label>
+      <textarea id="judge-manual" rows="2"></textarea>
+    </div>
+
+    <div class="block counsel-a">
+      <h2>Counsel A</h2>
+      <label>Full name</label>
+      <input type="text" id="a-name" placeholder="e.g. Marcus D. Ellery" />
+      <label>Disambiguating hint (firm — optional)</label>
+      <input type="text" id="a-hint" />
+      <button class="btn-secondary" onclick="researchProfile('a')">Research public record</button>
+      <div class="status-line" id="a-status"></div>
+      <label>Bio</label>
+      <textarea id="a-bio" rows="2"></textarea>
+      <label>Documented tendencies (one per line)</label>
+      <textarea id="a-tendencies" rows="3"></textarea>
+      <label>Sources (one per line)</label>
+      <textarea id="a-sources" rows="2"></textarea>
+      <label>Your notes (override / supplement)</label>
+      <textarea id="a-manual" rows="2"></textarea>
+    </div>
+
+    <div class="block counsel-b">
+      <h2>Counsel B</h2>
+      <label>Full name</label>
+      <input type="text" id="b-name" placeholder="e.g. Priya S. Nagle" />
+      <label>Disambiguating hint (firm — optional)</label>
+      <input type="text" id="b-hint" />
+      <button class="btn-secondary" onclick="researchProfile('b')">Research public record</button>
+      <div class="status-line" id="b-status"></div>
+      <label>Bio</label>
+      <textarea id="b-bio" rows="2"></textarea>
+      <label>Documented tendencies (one per line)</label>
+      <textarea id="b-tendencies" rows="3"></textarea>
+      <label>Sources (one per line)</label>
+      <textarea id="b-sources" rows="2"></textarea>
+      <label>Your notes (override / supplement)</label>
+      <textarea id="b-manual" rows="2"></textarea>
+    </div>
+
+    <div class="block">
+      <h2>Case</h2>
+      <label>Case description (real or hypothetical facts, posture, what's at issue)</label>
+      <textarea id="case-description" rows="6"></textarea>
+      <div class="row">
+        <div>
+          <label>Proceeding type</label>
+          <select id="case-type">
+            <option value="motion_hearing">Motion hearing</option>
+            <option value="full_trial" selected>Full trial</option>
+          </select>
+        </div>
+        <div>
+          <label>Argument rounds</label>
+          <input type="number" id="num-rounds" value="2" min="1" max="4" />
+        </div>
+      </div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="judge-questions" checked />
+        <label style="margin:0;">Allow judge to ask clarifying questions mid-argument</label>
+      </div>
+    </div>
+
+    <button class="btn-primary" id="start-btn" onclick="startSession()">Begin proceeding</button>
+  </div>
+
+  <div class="main" id="main">
+    <div class="empty-state">Fill in the panel on the left, then begin the proceeding. The transcript will appear here, live, as each party speaks.</div>
+  </div>
+</div>
+
+<script>
+function collectProfile(prefix, role){
+  return {
+    name: document.getElementById(prefix + '-name').value.trim(),
+    role: role,
+    bio: document.getElementById(prefix + '-bio').value.trim(),
+    tendencies: document.getElementById(prefix + '-tendencies').value.split('\n').map(s=>s.trim()).filter(Boolean),
+    notable_cases: (window.__cases && window.__cases[prefix]) || [],
+    sources: document.getElementById(prefix + '-sources').value.split('\n').map(s=>s.trim()).filter(Boolean),
+    confidence_note: (window.__confidence && window.__confidence[prefix]) || "",
+    manual_notes: document.getElementById(prefix + '-manual').value.trim(),
+    auto_researched: !!(window.__researched && window.__researched[prefix]),
+    found: true
+  };
+}
+
+window.__cases = {};
+window.__confidence = {};
+window.__researched = {};
+
+async function researchProfile(prefix){
+  const role = prefix === 'judge' ? 'judge' : 'counsel';
+  const name = document.getElementById(prefix + '-name').value.trim();
+  const hint = document.getElementById(prefix + '-hint').value.trim();
+  const statusEl = document.getElementById(prefix + '-status');
+  if(!name){ statusEl.textContent = 'Enter a name first.'; return; }
+  statusEl.textContent = 'Researching public record…';
+  try{
+    const resp = await fetch('/api/profile/research', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name, role, hint})
+    });
+    const data = await resp.json();
+    document.getElementById(prefix + '-bio').value = data.bio || '';
+    document.getElementById(prefix + '-tendencies').value = (data.tendencies || []).join('\n');
+    document.getElementById(prefix + '-sources').value = (data.sources || []).join('\n');
+    window.__cases[prefix] = data.notable_cases || [];
+    window.__confidence[prefix] = data.confidence_note || '';
+    window.__researched[prefix] = true;
+        if(data.found === false){
+      statusEl.textContent = 'Not found — reason: ' + (data.confidence_note || '(no detail returned)');
+    } else {
+      statusEl.textContent = 'Done. Review and edit before starting.';
+    }
+  }catch(err){
+    statusEl.textContent = 'Research failed — check the server console.';
+  }
+}
+
+function appendEntry(entry){
+  const main = document.getElementById('main');
+  const emptyState = main.querySelector('.empty-state');
+  if(emptyState) emptyState.remove();
+
+  const div = document.createElement('div');
+  div.className = `entry role-${entry.role} kind-${entry.kind}`;
+
+  const head = document.createElement('div');
+  head.className = 'entry-head';
+  const speaker = document.createElement('span');
+  speaker.className = 'speaker';
+  speaker.textContent = entry.speaker;
+  const tag = document.createElement('span');
+  tag.className = 'phase-tag';
+  tag.textContent = entry.kind === 'ruling' ? 'RULING (SIMULATED)' : entry.phase.replace(/_/g,' ');
+  head.appendChild(speaker);
+  head.appendChild(tag);
+  div.appendChild(head);
+
+  if(entry.kind === 'reasoning'){
+    const toggle = document.createElement('span');
+    toggle.className = 'reasoning-toggle';
+    toggle.textContent = 'show internal reasoning';
+    toggle.onclick = () => {
+      div.classList.toggle('expanded');
+      toggle.textContent = div.classList.contains('expanded') ? 'hide internal reasoning' : 'show internal reasoning';
+    };
+    div.appendChild(toggle);
+  }
+
+  const text = document.createElement('div');
+  text.className = 'entry-text';
+  text.textContent = entry.text;
+  div.appendChild(text);
+
+  main.appendChild(div);
+  main.scrollTop = main.scrollHeight;
+}
+
+async function startSession(){
+  const btn = document.getElementById('start-btn');
+  btn.disabled = true;
+  btn.textContent = 'Proceeding in progress…';
+
+  const main = document.getElementById('main');
+  main.innerHTML = '';
+
+  const payload = {
+    judge: collectProfile('judge', 'judge'),
+    counsel_a: collectProfile('a', 'counsel'),
+    counsel_b: collectProfile('b', 'counsel'),
+    case_description: document.getElementById('case-description').value.trim(),
+    case_type: document.getElementById('case-type').value,
+    num_rounds: parseInt(document.getElementById('num-rounds').value, 10) || 2,
+    include_judge_questions: document.getElementById('judge-questions').checked
+  };
+
+  try{
+    const resp = await fetch('/api/session/start', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while(true){
+      const {done, value} = await reader.read();
+      if(done) break;
+      buffer += decoder.decode(value, {stream:true});
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop();
+      for(const part of parts){
+        if(!part.startsWith('data:')) continue;
+        const jsonStr = part.slice(5).trim();
+        if(!jsonStr) continue;
+        const entry = JSON.parse(jsonStr);
+        if(entry.kind === 'done') continue;
+        appendEntry(entry);
+      }
+    }
+  }catch(err){
+    appendEntry({phase:'error', speaker:'System', role:'system', kind:'system', text:'Connection error — check the server console.'});
+  }finally{
+    btn.disabled = false;
+    btn.textContent = 'Begin proceeding';
+  }
+}
+</script>
+</body>
+</html>
