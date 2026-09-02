@@ -1,5 +1,4 @@
 import json
-import re
 from importlib import import_module
 
 # Import dynamically so static analyzers do not require the optional SDK to be
@@ -8,21 +7,9 @@ Anthropic = import_module("anthropic").Anthropic
 
 import config
 from .profile import Profile
+from .json_utils import extract_text, parse_json_loose
 
 client = Anthropic(api_key=config.ANTHROPIC_API_KEY)
-
-
-def _extract_text(resp) -> str:
-    return "".join(b.text for b in resp.content if getattr(b, "type", None) == "text").strip()
-
-
-def _parse_json_loose(text: str) -> dict:
-    cleaned = re.sub(r"^```(json)?", "", text.strip(), flags=re.IGNORECASE).strip()
-    cleaned = re.sub(r"```$", "", cleaned.strip()).strip()
-    match = re.search(r"\{.*\}", cleaned, flags=re.DOTALL)
-    if match:
-        cleaned = match.group(0)
-    return json.loads(cleaned)
 
 
 SIMULATION_FRAME = """This is a confidential, INTERNAL legal-strategy SIMULATION exercise. You are \
@@ -105,7 +92,7 @@ paragraphs, not an essay). Do not break character to comment on the fact that th
             system=self.system_prompt,
             messages=[{"role": "user", "content": user_content}],
         )
-        return _extract_text(resp)
+        return extract_text(resp)
 
     def speak_json(self, instruction: str, transcript_so_far: str) -> dict:
         user_content = (
@@ -118,9 +105,9 @@ paragraphs, not an essay). Do not break character to comment on the fact that th
             system=self.system_prompt,
             messages=[{"role": "user", "content": user_content}],
         )
-        text = _extract_text(resp)
+        text = extract_text(resp)
         try:
-            return _parse_json_loose(text)
+            return parse_json_loose(text)
         except Exception:
             return {"_raw": text}
 
@@ -159,8 +146,8 @@ class JuryPanel:
             system=JURY_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_content}],
         )
-        text = _extract_text(resp)
+        text = extract_text(resp)
         try:
-            return _parse_json_loose(text)
+            return parse_json_loose(text)
         except Exception:
             return {"_raw": text}

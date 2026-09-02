@@ -1,4 +1,3 @@
-import json
 import os
 import re
 from dataclasses import dataclass, field, asdict
@@ -7,25 +6,13 @@ from typing import List, Dict, Optional
 from anthropic import Anthropic
 
 import config
+from .json_utils import extract_text, parse_json_loose
 
 client = Anthropic(api_key=config.ANTHROPIC_API_KEY)
 
 
 def _slug(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "unnamed"
-
-
-def _extract_text(resp) -> str:
-    return "".join(b.text for b in resp.content if getattr(b, "type", None) == "text").strip()
-
-
-def _parse_json_loose(text: str) -> dict:
-    cleaned = re.sub(r"^```(json)?", "", text.strip(), flags=re.IGNORECASE).strip()
-    cleaned = re.sub(r"```$", "", cleaned.strip()).strip()
-    match = re.search(r"\{.*\}", cleaned, flags=re.DOTALL)
-    if match:
-        cleaned = match.group(0)
-    return json.loads(cleaned)
 
 
 UNVERIFIED_TAG = "unverified — model-generated"
@@ -196,9 +183,9 @@ If you cannot confidently identify a real, public professional matching this nam
         tools=[{"type": "web_search_20250305", "name": "web_search"}],
         messages=[{"role": "user", "content": user_prompt}],
     )
-    text = _extract_text(resp)
+    text = extract_text(resp)
     try:
-        data = _parse_json_loose(text)
+        data = parse_json_loose(text)
     except Exception:
         data = {
             "found": False,
